@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forge3D — Modelagem 3D (Espadas & Lanças)</title>
+  <style>
+    html, body { height: 100%; margin: 0; background:#0b0f14; color:#e6eef7; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; }
+    #app { position: fixed; inset: 0; }
+    .brand { position: fixed; left: 12px; top: 10px; font-weight: 700; letter-spacing: .3px; opacity: .85; background: rgba(9,13,18,.6); padding: 8px 10px; border-radius: 10px; backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.06)}
+    .toolbar { position: fixed; right: 12px; top: 10px; display:flex; gap:8px; z-index:10 }
+    .btn { border-radius: 12px; border:1px solid rgba(255,255,255,.1); background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); color:#e6eef7; padding:10px 12px; cursor:pointer; font-weight:600; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+    .btn:hover { background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04)); }
+    .footer { position: fixed; left: 12px; bottom: 10px; font-size: 12px; opacity: .7; background: rgba(9,13,18,.6); padding: 6px 10px; border-radius: 10px; border:1px solid rgba(255,255,255,.06) }
+    .lil-gui.root { --width: 340px; }
+    @media (max-width: 880px) { .lil-gui.root { --width: 92vw; } }
+
+    /* Modal */
+    #modal-container { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    #modal-box { background: #1f2937; color: #e6eef7; padding: 24px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 10px 30px rgba(0,0,0,.5); width: 90%; max-width: 400px; text-align: center; }
+    #modal-message { margin-bottom: 20px; font-size: 16px; white-space: pre-wrap; }
+    #modal-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: #e6eef7; margin-bottom: 15px; }
+    #modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-btn { border-radius: 8px; padding: 8px 16px; cursor: pointer; font-weight: 600; border: 1px solid transparent; }
+    .modal-btn.primary { background-color: #3b82f6; color: white; }
+    .modal-btn.secondary { background-color: transparent; border-color: #4b5563; color: #9ca3af; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
+        "lil-gui": "https://unpkg.com/lil-gui@0.19.0/dist/lil-gui.esm.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="brand">⚔️ Forge3D — armas para jogos (uso fictício)</div>
+  <div class="toolbar">
+    <button class="btn" id="btnRandom">Randomizar</button>
+    <button class="btn" id="btnPreset">Carregar Preset</button>
+    <button class="btn" id="btnExport">Exportar glTF</button>
+    <button class="btn" id="btnShot">Screenshot</button>
+    <button class="btn" id="btnSave">Salvar JSON</button>
+    <button class="btn" id="btnLoad">Carregar JSON</button>
+  </div>
+  <div class="footer">Dica: arraste com o mouse para orbitar • Shift = pan • roda = zoom</div>
+
+  <input type="file" id="fileJson" accept="application/json" style="display:none" />
+
+  <!-- Modal -->
+  <div id="modal-container">
+    <div id="modal-box">
+      <div id="modal-message"></div>
+      <input type="text" id="modal-input" style="display:none">
+      <div id="modal-buttons">
+        <button id="modal-cancel" class="modal-btn secondary" style="display:none">Cancelar</button>
+        <button id="modal-ok" class="modal-btn primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ===== Modal helpers =====
+    const modalContainer = document.getElementById('modal-container');
+    const modalMessage = document.getElementById('modal-message');
+    const modalInput = document.getElementById('modal-input');
+    const modalOkBtn = document.getElementById('modal-ok');
+    const modalCancelBtn = document.getElementById('modal-cancel');
+
+    function showAlert(message) {
+      modalMessage.textContent = message;
+      modalInput.style.display = 'none';
+      modalCancelBtn.style.display = 'none';
+      modalContainer.style.display = 'flex';
+      modalOkBtn.onclick = () => { modalContainer.style.display = 'none'; };
+    }
+    function showPrompt(message) {
+      return new Promise(resolve => {
+        modalMessage.textContent = message;
+        modalInput.value = '';
+        modalInput.style.display = 'block';
+        modalCancelBtn.style.display = 'block';
+        modalContainer.style.display = 'flex';
+        modalOkBtn.onclick = () => { modalContainer.style.display = 'none'; resolve(modalInput.value); };
+        modalCancelBtn.onclick = () => { modalContainer.style.display = 'none'; resolve(null); };
+      });
+    }
+
+    // ===== Imports =====
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js';
+    import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/exporters/GLTFExporter.js';
+    import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.0/dist/lil-gui.esm.js';
+    import { mergeGeometries } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/utils/BufferGeometryUtils.js';
+
+    // ===== Renderer / Scene =====
+    const appEl = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    appEl.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0f14);
+
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+    camera.position.set(2.2, 1.4, 3.2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // Luzes
+    const hemi = new THREE.HemisphereLight(0xdff1ff, 0x0a0c0f, 0.6); scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(5, 7, 3); dir.castShadow = false; scene.add(dir);
+    const rim = new THREE.DirectionalLight(0x88ccff, 0.6); rim.position.set(-6, 4, -3); scene.add(rim);
+
+    // Chão
+    const grid = new THREE.GridHelper(10, 20, 0x264051, 0x162531); grid.position.y = -0.001; scene.add(grid);
+
+    // ===== State & Presets =====
+    const state = {
+      geral: { tipo: 'Espada', escala: 1, autoRotacao: true, exibirChao: true },
+      metal: { cor: '#d7e1ea', metalness: 0.95, roughness: 0.2, normal: 0.45, ao: 0.6 },
+      madeira: { cor: '#7a5031', roughness: 0.65 },
+      couro: { cor: '#2c3e50', relevo: 0.6, repeticao: 8 },
+      detalhes: { dourado: '#c8a86a', metalness: 1.0, roughness: 0.35 },
+      espada: {
+        comprimento: 1.10, larguraBase: 0.065, larguraPonta: 0.02, espessura: 0.006, curvatura: 0.0,
+        ricasso: 0.05, fullerCompr: 0.60, fullerLarg: 0.008, fullerProf: 0.002,
+        guardaEstilo: 'reta', guardaLarg: 0.23, guardaEsp: 0.02,
+        empunhaduraComp: 0.28, empunhaduraRaioIni: 0.019, empunhaduraRaioFim: 0.016,
+        pomo: 'disco', pomoTam: 0.035
+      },
+      lanca: {
+        hasteComp: 2.2, hasteRaio: 0.016, pontaTipo: 'folha', pontaComp: 0.45, pontaLarg: 0.12,
+        pontaEsp: 0.01, soqueteComp: 0.10, soqueteRaio: 0.022, ponteiraBase: true
+      }
+    };
+
+    const swordPresets = [
+      { nome: 'Espada longa — clássica', apply: s => Object.assign(s, { comprimento:1.15, larguraBase:0.06, larguraPonta:0.02, fullerCompr:0.7, fullerLarg:0.008, guardaEstilo:'reta', guardaLarg:0.24, empunhaduraComp:0.30, pomo:'disco' }) },
+      { nome: 'Gládio curto', apply: s => Object.assign(s, { comprimento:0.78, larguraBase:0.08, larguraPonta:0.03, ricasso:0.02, fullerCompr:0.35, guardaLarg:0.12, empunhaduraComp:0.20, pomo:'esfera' }) },
+      { nome: 'Sabre leve (curvo)', apply: s => Object.assign(s, { comprimento:1.05, larguraBase:0.045, larguraPonta:0.018, curvatura:0.06, fullerCompr:0.55, guardaEstilo:'curva', guardaLarg:0.20, empunhaduraComp:0.27, pomo:'pera' }) },
+      { nome: 'Espada pesada', apply: s => Object.assign(s, { comprimento:1.25, larguraBase:0.075, larguraPonta:0.028, espessura:0.008, fullerCompr:0.5, guardaEstilo:'cruz', guardaLarg:0.28, empunhaduraComp:0.33, pomo:'disco' }) },
+      { nome: 'Espada curta utilitária', apply: s => Object.assign(s, { comprimento:0.65, larguraBase:0.055, larguraPonta:0.025, fullerCompr:0.25, guardaLarg:0.16, empunhaduraComp:0.18, pomo:'esfera' }) },
+      { nome: 'Rapiera leve', apply: s => Object.assign(s, { comprimento:1.20, larguraBase:0.03, larguraPonta:0.01, espessura:0.004, fullerCompr:0.0, guardaEstilo:'curva', guardaLarg:0.30, empunhaduraComp:0.30, pomo:'pera' }) }
+    ];
+    const spearPresets = [
+      { nome: 'Lança folha — padrão', apply: l => Object.assign(l, { hasteComp:2.0, pontaTipo:'folha', pontaComp:0.45, pontaLarg:0.12, soqueteComp:0.11 }) },
+      { nome: 'Dardo leve', apply: l => Object.assign(l, { hasteComp:1.4, hasteRaio:0.012, pontaTipo:'diamante', pontaComp:0.28, pontaLarg:0.07, soqueteComp:0.08 }) },
+      { nome: 'Alabarda simples (cabeça longa)', apply: l => Object.assign(l, { hasteComp:2.3, pontaTipo:'folha', pontaComp:0.60, pontaLarg:0.14, soqueteComp:0.12 }) },
+      { nome: 'Picot (cabeça estreita)', apply: l => Object.assign(l, { hasteComp:2.1, pontaTipo:'diamante', pontaComp:0.52, pontaLarg:0.08, soqueteComp:0.10 }) },
+      { nome: 'Azagaia curta', apply: l => Object.assign(l, { hasteComp:1.2, hasteRaio:0.011, pontaTipo:'folha', pontaComp:0.22, pontaLarg:0.06, soqueteComp:0.06 }) }
+    ];
+
+    // ===== Materiais & texturas =====
+    function makeLeatherTexture(repeat = 8) {
+      const size = 256, c = document.createElement('canvas'); c.width=c.height=size;
+      const g = c.getContext('2d'); g.fillStyle = '#888'; g.fillRect(0,0,size,size);
+      g.globalAlpha = 0.25; for (let i=0;i<300;i++){ const x=Math.random()*size,y=Math.random()*size,r=Math.random()*2+0.5; g.fillStyle=`hsl(0,0%,${40+Math.random()*20}%)`; g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill(); }
+      g.globalAlpha = 1; g.strokeStyle='rgba(255,255,255,.75)'; g.lineWidth=3;
+      for(let i=-size;i<size*2;i+= size/(repeat*1.4)){ g.beginPath(); g.moveTo(i,-10); g.lineTo(i+size,size+10); g.stroke(); }
+      const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,1); return t;
+    }
+    function makeWoodTexture() {
+      const size=256,c=document.createElement('canvas'); c.width=c.height=size; const g=c.getContext('2d');
+      g.fillStyle='#83572f'; g.fillRect(0,0,size,size); g.globalAlpha=.3; g.fillStyle='#000'; for(let y=0;y<size;y+=2){ g.fillRect(0,y,size,1); }
+      g.globalAlpha=.15; g.fillStyle='#fff'; for(let y=1;y<size;y+=4){ g.fillRect(0,y,size,1); }
+      const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,1); return t;
+    }
+    const textures = { leather: makeLeatherTexture(state.couro.repeticao), wood: makeWoodTexture() };
+    const metalMaterial = () => new THREE.MeshStandardMaterial({ color:new THREE.Color(state.metal.cor), metalness:state.metal.metalness, roughness:state.metal.roughness });
+    const goldMaterial  = () => new THREE.MeshStandardMaterial({ color:new THREE.Color(state.detalhes.dourado), metalness:state.detalhes.metalness, roughness:state.detalhes.roughness });
+    const woodMaterial  = () => new THREE.MeshStandardMaterial({ map:textures.wood, color:new THREE.Color(state.madeira.cor), roughness:state.madeira.roughness, metalness:0.0 });
+    const leatherMaterial = () => new THREE.MeshStandardMaterial({ map:makeLeatherTexture(state.couro.repeticao), color:new THREE.Color(state.couro.cor), roughness:0.8, metalness:0.0, normalScale:new THREE.Vector2(state.couro.relevo,state.couro.relevo) });
+
+    // ===== Builders =====
+    function buildSword(p) {
+      const g = new THREE.Group();
+
+      // Lâmina
+      const shape = new THREE.Shape();
+      const L = p.comprimento, Wb = p.larguraBase*0.5, Wt = p.larguraPonta*0.5;
+      const ricasso = Math.min(p.ricasso, L*0.3);
+      const thickness = p.espessura;
+
+      const curve = new THREE.QuadraticBezierCurve(
+        new THREE.Vector2(0,0),
+        new THREE.Vector2(p.curvatura*L*0.5, L*0.5),
+        new THREE.Vector2(p.curvatura*L, L)
+      );
+
+      shape.moveTo(Wb, 0);
+      shape.lineTo(Wb, ricasso);
+      shape.lineTo(Wt, L);
+      shape.lineTo(-Wt, L);
+      shape.lineTo(-Wb, ricasso);
+      shape.lineTo(-Wb, 0);
+      shape.closePath();
+
+      if (p.fullerCompr > 0 && p.fullerLarg > 0) {
+        const hole = new THREE.Path();
+        const fStart = ricasso + 0.02;
+        const fEnd = Math.min(fStart + p.fullerCompr, L - 0.03);
+        const fW = p.fullerLarg * 0.5;
+        hole.moveTo(-fW, fStart); hole.lineTo(-fW, fEnd); hole.lineTo(fW, fEnd); hole.lineTo(fW, fStart); hole.closePath();
+        shape.holes.push(hole);
+      }
+
+      const bladeGeom = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled:false, steps: 1 });
+      bladeGeom.rotateX(Math.PI/2);
+      bladeGeom.translate(0, 0.5*thickness, 0);
+      if (p.curvatura !== 0) {
+        const pos = bladeGeom.attributes.position;
+        for (let i=0;i<pos.count;i++) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          const t = z / L; const pt = curve.getPoint(t); pos.setX(i, x + pt.x);
+        }
+        pos.needsUpdate = true; bladeGeom.computeVertexNormals();
+      }
+      const blade = new THREE.Mesh(bladeGeom, metalMaterial());
+      blade.castShadow = blade.receiveShadow = false;
+      g.add(blade);
+
+      // Guarda
+      const guard = new THREE.Group();
+      const gl = p.guardaLarg, ge = p.guardaEsp;
+      let guardGeom;
+      if (p.guardaEstilo === 'reta') {
+        guardGeom = new THREE.BoxGeometry(gl, ge, 0.035);
+      } else if (p.guardaEstilo === 'curva') {
+        const pts = []; const half = gl*0.5, curveAmt = Math.max(0.02, gl*0.12);
+        for (let i=-half;i<=half;i+= gl/24) { const y = Math.sin((i/half)*Math.PI*0.5)*curveAmt; pts.push(new THREE.Vector2(Math.abs(i), y+ge*0.5)); }
+        guardGeom = new THREE.LatheGeometry(pts, 48); guardGeom.rotateZ(Math.PI/2); guardGeom.scale(1, 1, 0.08);
+      } else {
+        const main = new THREE.BoxGeometry(gl, ge, 0.03);
+        const cross = new THREE.BoxGeometry(0.03, ge, 0.18);
+        const mg = new THREE.Mesh(main), cg = new THREE.Mesh(cross);
+        const tmp = new THREE.Group(); tmp.add(mg); tmp.add(cg); tmp.updateMatrixWorld(true);
+        guardGeom = mergeGeometries([mg.geometry, cg.geometry]) || main;
+      }
+      const guardMesh = new THREE.Mesh(guardGeom, goldMaterial());
+      guardMesh.position.set(0, ge*0.5, 0.0);
+      guardMesh.position.z = state.espada.ricasso;
+      guard.add(guardMesh);
+      g.add(guard);
+
+      // Empunhadura — HORIZONTAL (eixo Z)
+      const handleGeom = new THREE.CylinderGeometry(p.empunhaduraRaioFim, p.empunhaduraRaioIni, p.empunhaduraComp, 24, 1, true);
+      const handle = new THREE.Mesh(handleGeom, leatherMaterial());
+      handle.rotation.x = Math.PI / 2;
+      handle.position.y = p.guardaEsp * 0.5;
+      handle.position.z = -p.empunhaduraComp * 0.5;
+      g.add(handle);
+
+      // Pomo — HORIZONTAL
+      let pommGeom;
+      if (p.pomo === 'disco') pommGeom = new THREE.CylinderGeometry(p.pomoTam*1.1, p.pomoTam*1.1, p.pomoTam*0.35, 32);
+      else if (p.pomo === 'esfera') pommGeom = new THREE.SphereGeometry(p.pomoTam*0.6, 32, 16);
+      else pommGeom = new THREE.SphereGeometry(p.pomoTam*0.6, 32, 16).scale(0.8, 1.2, 0.8);
+      const pommel = new THREE.Mesh(pommGeom, goldMaterial());
+      pommel.rotation.x = Math.PI / 2;
+      pommel.position.y = p.guardaEsp * 0.5;
+      pommel.position.z = -p.empunhaduraComp - (p.pomoTam * 0.25);
+      g.add(pommel);
+
+      // posicionamento geral
+      g.position.set(0, 0.25, -p.comprimento*0.35);
+      g.scale.setScalar(state.geral.escala);
+      return g;
+    }
+
+    function buildSpear(p) {
+      const g = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(p.hasteRaio, p.hasteRaio, p.hasteComp, 24), woodMaterial());
+      shaft.position.z = -(p.hasteComp*0.5); g.add(shaft);
+
+      const socket = new THREE.Mesh(new THREE.ConeGeometry(p.soqueteRaio, p.soqueteComp, 24, 1, true), goldMaterial());
+      socket.rotation.x = Math.PI; socket.position.z = 0.0; g.add(socket);
+
+      const shape = new THREE.Shape();
+      const L = p.pontaComp, W = p.pontaLarg*0.5, T = p.pontaEsp;
+      if (p.pontaTipo === 'folha') { shape.moveTo(0,0); shape.quadraticCurveTo(W*0.6, L*0.35, 0, L); shape.quadraticCurveTo(-W*0.6, L*0.35, 0, 0); }
+      else { shape.moveTo(0,0); shape.lineTo(W, L*0.5); shape.lineTo(0, L); shape.lineTo(-W, L*0.5); shape.closePath(); }
+      const headGeom = new THREE.ExtrudeGeometry(shape, { depth:T, bevelEnabled:false });
+      headGeom.rotateX(Math.PI/2); headGeom.translate(0, T*0.5, 0);
+      const head = new THREE.Mesh(headGeom, metalMaterial()); head.position.z = 0.0; g.add(head);
+
+      if (p.ponteiraBase) {
+        const butt = new THREE.Mesh(new THREE.ConeGeometry(p.soqueteRaio*0.7, p.soqueteComp*0.8, 24), goldMaterial());
+        butt.position.z = -p.hasteComp; g.add(butt);
+      }
+
+      g.position.set(0, 0.25, -p.pontaComp*0.6);
+      g.scale.setScalar(state.geral.escala);
+      return g;
+    }
+
+    // ===== Model container =====
+    let model = new THREE.Group(); scene.add(model);
+    let gui; let fEspada, fLanca, fMetal, fMadeira, fCouro, fDet;
+
+    function disableAllGUI() {
+      if (!gui) return;
+      gui.controllersRecursive().forEach(ctrl => ctrl.disable?.());
+      [fEspada, fLanca, fMetal, fMadeira, fCouro, fDet].filter(Boolean).forEach(f => f.close?.());
+    }
+
+    function setupGUI() {
+      if (gui) gui.destroy();
+      gui = new GUI({ title: 'Forge3D — Opções' });
+
+      const fGeral = gui.addFolder('Geral');
+      fGeral.add(state.geral, 'tipo', ['Espada','Lança']).name('Tipo').onChange(rebuild);
+      fGeral.add(state.geral, 'escala', 0.6, 1.6, 0.01).name('Escala').onChange(()=>{ model.scale.setScalar(state.geral.escala) });
+      fGeral.add(state.geral, 'autoRotacao').name('Rotação automática');
+      fGeral.add(state.geral, 'exibirChao').name('Exibir grade').onChange(v=> grid.visible = v);
+
+      fMetal = gui.addFolder('Metal');
+      fMetal.addColor(state.metal, 'cor').name('Cor').onChange(rebuild);
+      fMetal.add(state.metal, 'metalness', 0.0, 1.0, 0.01).name('Metalness').onChange(rebuild);
+      fMetal.add(state.metal, 'roughness', 0.0, 1.0, 0.01).name('Rugosidade').onChange(rebuild);
+
+      fMadeira = gui.addFolder('Madeira');
+      fMadeira.addColor(state.madeira, 'cor').name('Cor').onChange(rebuild);
+      fMadeira.add(state.madeira, 'roughness', 0.0, 1.0, 0.01).name('Rugosidade').onChange(rebuild);
+
+      fCouro = gui.addFolder('Couro (empunhadura)');
+      fCouro.addColor(state.couro, 'cor').name('Cor').onChange(rebuild);
+      fCouro.add(state.couro, 'relevo', 0.0, 2.0, 0.01).name('Relevo').onChange(rebuild);
+      fCouro.add(state.couro, 'repeticao', 2, 16, 1).name('Repetição').onChange(rebuild);
+
+      fDet = gui.addFolder('Detalhes (dourado)');
+      fDet.addColor(state.detalhes, 'dourado').name('Cor').onChange(rebuild);
+      fDet.add(state.detalhes, 'roughness', 0.0, 1.0, 0.01).name('Rugosidade').onChange(rebuild);
+
+      fEspada = gui.addFolder('Espada');
+      fEspada.add(state.espada, 'comprimento', 0.5, 1.6, 0.01).name('Comprimento (m)').onChange(rebuild);
+      fEspada.add(state.espada, 'larguraBase', 0.03, 0.12, 0.001).name('Largura base (m)').onChange(rebuild);
+      fEspada.add(state.espada, 'larguraPonta', 0.005, 0.08, 0.001).name('Largura ponta (m)').onChange(rebuild);
+      fEspada.add(state.espada, 'espessura', 0.002, 0.02, 0.001).name('Espessura (m)').onChange(rebuild);
+      fEspada.add(state.espada, 'curvatura', -0.12, 0.12, 0.001).name('Curvatura').onChange(rebuild);
+      fEspada.add(state.espada, 'ricasso', 0.0, 0.12, 0.001).name('Ricasso').onChange(rebuild);
+
+      const fFuller = fEspada.addFolder('Fuller (canal)');
+      fFuller.add(state.espada, 'fullerCompr', 0.0, 1.0, 0.01).name('Comprimento (m)').onChange(rebuild);
+      fFuller.add(state.espada, 'fullerLarg', 0.0, 0.02, 0.0005).name('Largura (m)').onChange(rebuild);
+
+      const fGuard = fEspada.addFolder('Guarda');
+      fGuard.add(state.espada, 'guardaEstilo', ['reta','curva','cruz']).name('Estilo').onChange(rebuild);
+      fGuard.add(state.espada, 'guardaLarg', 0.08, 0.36, 0.005).name('Largura').onChange(rebuild);
+      fGuard.add(state.espada, 'guardaEsp', 0.006, 0.05, 0.001).name('Espessura').onChange(rebuild);
+
+      const fEmp = fEspada.addFolder('Empunhadura');
+      fEmp.add(state.espada, 'empunhaduraComp', 0.12, 0.42, 0.005).name('Comprimento').onChange(rebuild);
+      fEmp.add(state.espada, 'empunhaduraRaioIni', 0.01, 0.03, 0.001).name('Raio inicial').onChange(rebuild);
+      fEmp.add(state.espada, 'empunhaduraRaioFim', 0.008, 0.03, 0.001).name('Raio final').onChange(rebuild);
+
+      const fPomo = fEspada.addFolder('Pomo');
+      fPomo.add(state.espada, 'pomo', ['disco','esfera','pera']).name('Tipo').onChange(rebuild);
+      fPomo.add(state.espada, 'pomoTam', 0.02, 0.08, 0.001).name('Tamanho').onChange(rebuild);
+
+      fLanca = gui.addFolder('Lança');
+      fLanca.add(state.lanca, 'hasteComp', 0.8, 3.2, 0.01).name('Haste — comprimento').onChange(rebuild);
+      fLanca.add(state.lanca, 'hasteRaio', 0.008, 0.03, 0.001).name('Haste — raio').onChange(rebuild);
+      fLanca.add(state.lanca, 'pontaTipo', ['folha','diamante']).name('Tipo de ponta').onChange(rebuild);
+      fLanca.add(state.lanca, 'pontaComp', 0.18, 0.8, 0.005).name('Ponta — comprimento').onChange(rebuild);
+      fLanca.add(state.lanca, 'pontaLarg', 0.04, 0.24, 0.005).name('Ponta — largura').onChange(rebuild);
+      fLanca.add(state.lanca, 'pontaEsp', 0.004, 0.03, 0.001).name('Ponta — espessura').onChange(rebuild);
+      fLanca.add(state.lanca, 'soqueteComp', 0.05, 0.24, 0.005).name('Soquete — comp.').onChange(rebuild);
+      fLanca.add(state.lanca, 'soqueteRaio', 0.012, 0.05, 0.001).name('Soquete — raio').onChange(rebuild);
+      fLanca.add(state.lanca, 'ponteiraBase').name('Ponteira traseira').onChange(rebuild);
+
+      const fAcoes = gui.addFolder('Ações');
+      fAcoes.add({
+        juntarPecas: () => {
+          const meshes = [];
+          model.traverse(child => { if (child.isMesh) meshes.push(child); });
+          if (meshes.length < 2) { showAlert('É preciso pelo menos 2 peças para juntar.'); return; }
+
+          const geometries = [];
+          for (const mesh of meshes) {
+            let geometry = mesh.geometry.clone();
+            if (geometry.index) geometry = geometry.toNonIndexed();
+            mesh.updateWorldMatrix(true, false);
+            geometry.applyMatrix4(mesh.matrixWorld);
+            geometries.push(geometry);
+          }
+
+          const mergedGeometry = mergeGeometries(geometries);
+          geometries.forEach(g => g.dispose?.());
+          if (!mergedGeometry) { showAlert('Falha ao combinar as geometrias.'); return; }
+
+          mergedGeometry.computeVertexNormals();
+          mergedGeometry.computeBoundingBox();
+          mergedGeometry.computeBoundingSphere();
+
+          const combinedMesh = new THREE.Mesh(mergedGeometry, metalMaterial());
+
+          scene.remove(model);
+          model.traverse(n => {
+            if (n.geometry) n.geometry.dispose?.();
+            if (n.material) { if (Array.isArray(n.material)) n.material.forEach(m=>m.dispose?.()); else n.material.dispose?.(); }
+          });
+          model = combinedMesh;
+          scene.add(model);
+
+          // Enquadrar câmera
+          if (mergedGeometry.boundingSphere) {
+            const c = mergedGeometry.boundingSphere.center.clone();
+            const r = Math.max(mergedGeometry.boundingSphere.radius, 0.1);
+            controls.target.copy(c);
+            const fovRad = camera.fov * Math.PI / 180;
+            const dist = r / Math.tan(fovRad * 0.5);
+            const offset = new THREE.Vector3(dist * 0.9, dist * 0.5, dist * 1.1);
+            camera.position.copy(c).add(offset);
+            camera.near = Math.max(0.01, dist * 0.01);
+            camera.far  = Math.max(200, dist * 5);
+            camera.updateProjectionMatrix();
+          }
+
+          disableAllGUI();
+          showAlert('Peças unidas com sucesso!');
+        }
+      }, 'juntarPecas').name('Juntar Peças');
+    }
+
+    function rebuild() {
+      scene.remove(model);
+      model.traverse(n => {
+        if (n.geometry) n.geometry.dispose?.();
+        if (n.material) { if (Array.isArray(n.material)) n.material.forEach(m=>m.dispose?.()); else n.material.dispose?.(); }
+      });
+      model.clear?.();
+
+      model = (state.geral.tipo === 'Espada') ? buildSword(state.espada) : buildSpear(state.lanca);
+      scene.add(model);
+      setupGUI();
+    }
+
+    // ===== Botões =====
+    document.getElementById('btnRandom').addEventListener('click', () => {
+      const rnd = (min,max,step=0.001)=> Math.round((min + Math.random()*(max-min))/step)*step;
+      if (state.geral.tipo === 'Espada') {
+        const p = state.espada;
+        p.comprimento = rnd(0.6, 1.4, 0.01);
+        p.larguraBase = rnd(0.04, 0.09, 0.001);
+        p.larguraPonta = rnd(0.008, 0.05, 0.001);
+        p.espessura = rnd(0.003, 0.012, 0.001);
+        p.curvatura = rnd(-0.10, 0.10, 0.001);
+        p.ricasso = rnd(0.0, 0.10, 0.001);
+        p.fullerCompr = rnd(0.0, 0.9, 0.01);
+        p.fullerLarg = rnd(0.0, 0.016, 0.0005);
+        p.guardaEstilo = ['reta','curva','cruz'][Math.floor(Math.random()*3)];
+        p.guardaLarg = rnd(0.12, 0.32, 0.005);
+        p.guardaEsp = rnd(0.008, 0.04, 0.001);
+        p.empunhaduraComp = rnd(0.16, 0.36, 0.005);
+        p.empunhaduraRaioIni = rnd(0.012, 0.028, 0.001);
+        p.empunhaduraRaioFim = rnd(0.010, 0.026, 0.001);
+        p.pomo = ['disco','esfera','pera'][Math.floor(Math.random()*3)];
+        p.pomoTam = rnd(0.025, 0.06, 0.001);
+      } else {
+        const p = state.lanca;
+        p.hasteComp = rnd(1.0, 3.0, 0.01);
+        p.hasteRaio = rnd(0.01, 0.026, 0.001);
+        p.pontaTipo = ['folha','diamante'][Math.floor(Math.random()*2)];
+        p.pontaComp = rnd(0.22, 0.72, 0.005);
+        p.pontaLarg = rnd(0.05, 0.2, 0.005);
+        p.pontaEsp = rnd(0.006, 0.02, 0.001);
+        p.soqueteComp = rnd(0.06, 0.22, 0.005);
+        p.soqueteRaio = rnd(0.014, 0.04, 0.001);
+        p.ponteiraBase = Math.random() > 0.3;
+      }
+      const colors = ['#d7e1ea','#f2f2f2','#cdd6e1','#e5e1d7'];
+      state.metal.cor = colors[Math.floor(Math.random()*colors.length)];
+      state.detalhes.dourado = ['#c8a86a','#b08d57','#a7a7a7','#d6c1a3'][Math.floor(Math.random()*4)];
+      state.couro.cor = ['#2c3e50','#4b3621','#1f2937','#3c2f2f','#0f172a'][Math.floor(Math.random()*5)];
+      state.madeira.cor = ['#7a5031', '#6b4423', '#8b5e34', '#5f4320'][Math.floor(Math.random()*4)];
+      rebuild();
+      gui.controllersRecursive().forEach(c=>c.updateDisplay?.());
+    });
+
+    document.getElementById('btnPreset').addEventListener('click', async () => {
+      const list = state.geral.tipo === 'Espada' ? swordPresets : spearPresets;
+      const nomes = list.map((p,i)=> `${i+1}. ${p.nome}`).join('\n');
+      const idx = await showPrompt(`Escolha um preset (1-${list.length}):\n\n${nomes}`);
+      const n = parseInt(idx || '0', 10)-1; if (isNaN(n) || !list[n]) return;
+      if (state.geral.tipo === 'Espada') list[n].apply(state.espada); else list[n].apply(state.lanca);
+      rebuild();
+      gui.controllersRecursive().forEach(c=>c.updateDisplay?.());
+    });
+
+    document.getElementById('btnExport').addEventListener('click', () => {
+      const exporter = new GLTFExporter();
+      exporter.parse(model, (gltf) => {
+        const blob = new Blob([JSON.stringify(gltf)], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `forge3d_${state.geral.tipo.toLowerCase()}.gltf`; a.click();
+        URL.revokeObjectURL(url);
+      }, { binary:false });
+    });
+
+    document.getElementById('btnShot').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'forge3d_screenshot.png';
+      link.href = renderer.domElement.toDataURL('image/png');
+      link.click();
+    });
+
+    document.getElementById('btnSave').addEventListener('click', () => {
+      const data = JSON.stringify(state, null, 2);
+      const blob = new Blob([data], { type:'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'forge3d_config.json'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    const fileInput = document.getElementById('fileJson');
+    document.getElementById('btnLoad').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0]; if (!file) return;
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        Object.assign(state.geral, json.geral || {});
+        Object.assign(state.metal, json.metal || {});
+        Object.assign(state.madeira, json.madeira || {});
+        Object.assign(state.couro, json.couro || {});
+        Object.assign(state.detalhes, json.detalhes || {});
+        Object.assign(state.espada, json.espada || {});
+        Object.assign(state.lanca, json.lanca || {});
+        rebuild();
+        gui.controllersRecursive().forEach(c=>c.updateDisplay?.());
+      } catch(err) { showAlert('Falha ao carregar JSON: '+err.message); }
+      e.target.value = '';
+    });
+
+    // ===== Loop =====
+    rebuild();
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.016;
+      if (state.geral.autoRotacao) model.rotation.y += 0.0035;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    console.log('Forge3D — este app destina-se a uso criativo/didático para assets digitais (jogos/arte). Não para construção de itens reais.');
+  </script>
+</body>
+</html>
