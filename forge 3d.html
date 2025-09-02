@@ -2,22 +2,71 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>Forge3D — Modelagem 3D (Espadas & Lanças)</title>
   <style>
-    html, body { height: 100%; margin: 0; background:#0b0f14; color:#e6eef7; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; }
+    :root {
+      --panel-bg: rgba(9,13,18,.6);
+      --panel-bd: rgba(255,255,255,.06);
+      --btn-grad-1: rgba(255,255,255,.08);
+      --btn-grad-2: rgba(255,255,255,.02);
+      --btn-grad-1-hover: rgba(255,255,255,.12);
+      --btn-grad-2-hover: rgba(255,255,255,.04);
+      --brand: #e6eef7;
+    }
+    html, body { height: 100%; margin: 0; background:#0b0f14; color:var(--brand); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; }
     #app { position: fixed; inset: 0; }
-    .brand { position: fixed; left: 12px; top: 10px; font-weight: 700; letter-spacing: .3px; opacity: .85; background: rgba(9,13,18,.6); padding: 8px 10px; border-radius: 10px; backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.06)}
-    .toolbar { position: fixed; right: 12px; top: 10px; display:flex; gap:8px; z-index:10 }
-    .btn { border-radius: 12px; border:1px solid rgba(255,255,255,.1); background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); color:#e6eef7; padding:10px 12px; cursor:pointer; font-weight:600; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
-    .btn:hover { background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04)); }
-    .footer { position: fixed; left: 12px; bottom: 10px; font-size: 12px; opacity: .7; background: rgba(9,13,18,.6); padding: 6px 10px; border-radius: 10px; border:1px solid rgba(255,255,255,.06) }
+    .brand {
+      position: fixed; left: env(safe-area-inset-left, 12px); top: calc(env(safe-area-inset-top, 0px) + 10px);
+      font-weight: 700; letter-spacing: .3px; opacity: .9;
+      background: var(--panel-bg); padding: 8px 10px; border-radius: 10px; backdrop-filter: blur(6px); border:1px solid var(--panel-bd); z-index: 8;
+    }
+    .toolbar {
+      position: fixed; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px);
+      display:flex; gap:8px; z-index:10; align-items: center; flex-wrap: wrap;
+      background: var(--panel-bg); border:1px solid var(--panel-bd); padding:8px; border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    }
+    .btn {
+      border-radius: 12px; border:1px solid rgba(255,255,255,.1);
+      background:linear-gradient(180deg, var(--btn-grad-1), var(--btn-grad-2));
+      color:var(--brand); padding:10px 12px; cursor:pointer; font-weight:600; user-select:none;
+    }
+    .btn:hover { background: linear-gradient(180deg, var(--btn-grad-1-hover), var(--btn-grad-2-hover)); }
+    .footer {
+      position: fixed; left: env(safe-area-inset-left, 12px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); font-size: 12px; opacity: .75;
+      background: var(--panel-bg); padding: 6px 10px; border-radius: 10px; border:1px solid var(--panel-bd); z-index: 6;
+    }
+
     .lil-gui.root { --width: 340px; }
-    @media (max-width: 880px) { .lil-gui.root { --width: 92vw; } }
+    @media (max-width: 1100px) {
+      .lil-gui.root { --width: 300px; }
+    }
+    /* MOBILE */
+    @media (max-width: 720px) {
+      .lil-gui.root { --width: 92vw; }
+      .brand { font-size: 14px; padding: 6px 8px; }
+      .toolbar {
+        left: env(safe-area-inset-left, 10px);
+        right: env(safe-area-inset-right, 10px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+        top: auto;
+        justify-content: center;
+        gap: 6px;
+        border-radius: 16px;
+      }
+      .btn {
+        flex: 1 1 auto; min-height: 44px; padding: 10px 14px; font-size: 14px;
+      }
+      .footer { display:none; } /* economiza espaço em mobile */
+      .toolbar .btn--compact { display:none; } /* esconder opções menos usadas em telas pequenas */
+      .toolbar::-webkit-scrollbar { display:none; }
+    }
 
     /* Modal */
     #modal-container { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-    #modal-box { background: #1f2937; color: #e6eef7; padding: 24px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 10px 30px rgba(0,0,0,.5); width: 90%; max-width: 400px; text-align: center; }
+    #modal-box { background: #1f2937; color: #e6eef7; padding: 24px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 10px 30px rgba(0,0,0,.5); width: min(92vw, 400px); text-align: center; }
     #modal-message { margin-bottom: 20px; font-size: 16px; white-space: pre-wrap; }
     #modal-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: #e6eef7; margin-bottom: 15px; }
     #modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
@@ -25,6 +74,7 @@
     .modal-btn.primary { background-color: #3b82f6; color: white; }
     .modal-btn.secondary { background-color: transparent; border-color: #4b5563; color: #9ca3af; }
   </style>
+
   <script type="importmap">
     {
       "imports": {
@@ -37,16 +87,20 @@
 </head>
 <body>
   <div id="app"></div>
+
   <div class="brand">⚔️ Forge3D — armas para jogos (uso fictício)</div>
-  <div class="toolbar">
+
+  <div class="toolbar" id="toolbar">
     <button class="btn" id="btnRandom">Randomizar</button>
-    <button class="btn" id="btnPreset">Carregar Preset</button>
-    <button class="btn" id="btnExport">Exportar glTF</button>
+    <button class="btn" id="btnPreset">Preset</button>
+    <button class="btn btn--compact" id="btnExport">Exportar glTF</button>
     <button class="btn" id="btnShot">Screenshot</button>
-    <button class="btn" id="btnSave">Salvar JSON</button>
-    <button class="btn" id="btnLoad">Carregar JSON</button>
+    <button class="btn btn--compact" id="btnSave">Salvar JSON</button>
+    <button class="btn btn--compact" id="btnLoad">Carregar JSON</button>
+    <button class="btn" id="btnFS" title="Tela cheia (mobile)">Tela cheia</button>
   </div>
-  <div class="footer">Dica: arraste com o mouse para orbitar • Shift = pan • roda = zoom</div>
+
+  <div class="footer">Dica: arraste para orbitar • Dois dedos = pan • pinça = zoom</div>
 
   <input type="file" id="fileJson" accept="application/json" style="display:none" />
 
@@ -96,35 +150,46 @@
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.0/dist/lil-gui.esm.js';
     import { mergeGeometries } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/utils/BufferGeometryUtils.js';
 
-    // ===== Renderer / Scene =====
+    // ===== Helpers (mobile/responsivo) =====
+    const isMobile = matchMedia('(max-width: 720px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const DPR_LIMIT = isMobile ? 1.6 : 2;
     const appEl = document.getElementById('app');
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
+
+    // ===== Renderer / Scene =====
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    function setRendererSize() {
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR_LIMIT));
+      renderer.setSize(innerWidth, innerHeight, false);
+    }
+    setRendererSize();
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     appEl.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0f14);
 
-    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 500);
     camera.position.set(2.2, 1.4, 3.2);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI * 0.49;
+    controls.screenSpacePanning = true; // melhor feeling no touch
 
     // Luzes
-    const hemi = new THREE.HemisphereLight(0xdff1ff, 0x0a0c0f, 0.6); scene.add(hemi);
+    const hemi = new THREE.HemisphereLight(0xdff1ff, 0x0a0c0f, isMobile ? 0.7 : 0.6); scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(5, 7, 3); dir.castShadow = false; scene.add(dir);
     const rim = new THREE.DirectionalLight(0x88ccff, 0.6); rim.position.set(-6, 4, -3); scene.add(rim);
 
-    // Chão
-    const grid = new THREE.GridHelper(10, 20, 0x264051, 0x162531); grid.position.y = -0.001; scene.add(grid);
+    // Grid: menor em mobile para performance
+    const grid = new THREE.GridHelper(isMobile ? 8 : 10, isMobile ? 18 : 20, 0x264051, 0x162531);
+    grid.position.y = -0.001;
+    grid.visible = !isMobile; // começa oculto em mobile
+    scene.add(grid);
 
-    // ===== State & Presets =====
+    // ===== State & Presets (iguais ao desktop, só mudando autoRotacao no mobile) =====
     const state = {
-      geral: { tipo: 'Espada', escala: 1, autoRotacao: true, exibirChao: true },
+      geral: { tipo: 'Espada', escala: 1, autoRotacao: !matchMedia('(prefers-reduced-motion: reduce)').matches && !isMobile ? true : false, exibirChao: !isMobile ? true : false },
       metal: { cor: '#d7e1ea', metalness: 0.95, roughness: 0.2, normal: 0.45, ao: 0.6 },
       madeira: { cor: '#7a5031', roughness: 0.65 },
       couro: { cor: '#2c3e50', relevo: 0.6, repeticao: 8 },
@@ -136,12 +201,8 @@
         empunhaduraComp: 0.28, empunhaduraRaioIni: 0.019, empunhaduraRaioFim: 0.016,
         pomo: 'disco', pomoTam: 0.035
       },
-      lanca: {
-        hasteComp: 2.2, hasteRaio: 0.016, pontaTipo: 'folha', pontaComp: 0.45, pontaLarg: 0.12,
-        pontaEsp: 0.01, soqueteComp: 0.10, soqueteRaio: 0.022, ponteiraBase: true
-      }
+      lanca: { hasteComp: 2.2, hasteRaio: 0.016, pontaTipo: 'folha', pontaComp: 0.45, pontaLarg: 0.12, pontaEsp: 0.01, soqueteComp: 0.10, soqueteRaio: 0.022, ponteiraBase: true }
     };
-
     const swordPresets = [
       { nome: 'Espada longa — clássica', apply: s => Object.assign(s, { comprimento:1.15, larguraBase:0.06, larguraPonta:0.02, fullerCompr:0.7, fullerLarg:0.008, guardaEstilo:'reta', guardaLarg:0.24, empunhaduraComp:0.30, pomo:'disco' }) },
       { nome: 'Gládio curto', apply: s => Object.assign(s, { comprimento:0.78, larguraBase:0.08, larguraPonta:0.03, ricasso:0.02, fullerCompr:0.35, guardaLarg:0.12, empunhaduraComp:0.20, pomo:'esfera' }) },
@@ -158,7 +219,7 @@
       { nome: 'Azagaia curta', apply: l => Object.assign(l, { hasteComp:1.2, hasteRaio:0.011, pontaTipo:'folha', pontaComp:0.22, pontaLarg:0.06, soqueteComp:0.06 }) }
     ];
 
-    // ===== Materiais & texturas =====
+    // ===== Texturas & materiais =====
     function makeLeatherTexture(repeat = 8) {
       const size = 256, c = document.createElement('canvas'); c.width=c.height=size;
       const g = c.getContext('2d'); g.fillStyle = '#888'; g.fillRect(0,0,size,size);
@@ -173,10 +234,9 @@
       g.globalAlpha=.15; g.fillStyle='#fff'; for(let y=1;y<size;y+=4){ g.fillRect(0,y,size,1); }
       const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,1); return t;
     }
-    const textures = { leather: makeLeatherTexture(state.couro.repeticao), wood: makeWoodTexture() };
     const metalMaterial = () => new THREE.MeshStandardMaterial({ color:new THREE.Color(state.metal.cor), metalness:state.metal.metalness, roughness:state.metal.roughness });
     const goldMaterial  = () => new THREE.MeshStandardMaterial({ color:new THREE.Color(state.detalhes.dourado), metalness:state.detalhes.metalness, roughness:state.detalhes.roughness });
-    const woodMaterial  = () => new THREE.MeshStandardMaterial({ map:textures.wood, color:new THREE.Color(state.madeira.cor), roughness:state.madeira.roughness, metalness:0.0 });
+    const woodMaterial  = () => new THREE.MeshStandardMaterial({ map:makeWoodTexture(), color:new THREE.Color(state.madeira.cor), roughness:state.madeira.roughness, metalness:0.0 });
     const leatherMaterial = () => new THREE.MeshStandardMaterial({ map:makeLeatherTexture(state.couro.repeticao), color:new THREE.Color(state.couro.cor), roughness:0.8, metalness:0.0, normalScale:new THREE.Vector2(state.couro.relevo,state.couro.relevo) });
 
     // ===== Builders =====
@@ -311,6 +371,24 @@
       [fEspada, fLanca, fMetal, fMadeira, fCouro, fDet].filter(Boolean).forEach(f => f.close?.());
     }
 
+    // ===== Camera fitting =====
+    function fitCameraToObject(obj, pad = 1.25) {
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = new THREE.Vector3(); box.getSize(size);
+      const center = new THREE.Vector3(); box.getCenter(center);
+
+      const maxDim = Math.max(size.x, size.y, size.z) * pad;
+      const fov = camera.fov * (Math.PI / 180);
+      const distance = maxDim / (2 * Math.tan(fov / 2));
+
+      controls.target.copy(center);
+      const dir = new THREE.Vector3(1, 0.5, 1).normalize(); // ângulo agradável
+      camera.position.copy(center).addScaledVector(dir, distance);
+      camera.near = Math.max(0.01, distance * 0.01);
+      camera.far  = Math.max(500, distance * 6);
+      camera.updateProjectionMatrix();
+    }
+
     function setupGUI() {
       if (gui) gui.destroy();
       gui = new GUI({ title: 'Forge3D — Opções' });
@@ -410,20 +488,7 @@
           model = combinedMesh;
           scene.add(model);
 
-          // Enquadrar câmera
-          if (mergedGeometry.boundingSphere) {
-            const c = mergedGeometry.boundingSphere.center.clone();
-            const r = Math.max(mergedGeometry.boundingSphere.radius, 0.1);
-            controls.target.copy(c);
-            const fovRad = camera.fov * Math.PI / 180;
-            const dist = r / Math.tan(fovRad * 0.5);
-            const offset = new THREE.Vector3(dist * 0.9, dist * 0.5, dist * 1.1);
-            camera.position.copy(c).add(offset);
-            camera.near = Math.max(0.01, dist * 0.01);
-            camera.far  = Math.max(200, dist * 5);
-            camera.updateProjectionMatrix();
-          }
-
+          fitCameraToObject(model, 1.25);
           disableAllGUI();
           showAlert('Peças unidas com sucesso!');
         }
@@ -441,9 +506,11 @@
       model = (state.geral.tipo === 'Espada') ? buildSword(state.espada) : buildSpear(state.lanca);
       scene.add(model);
       setupGUI();
+      fitCameraToObject(model, 1.2);
     }
 
     // ===== Botões =====
+    const fileInput = document.getElementById('fileJson');
     document.getElementById('btnRandom').addEventListener('click', () => {
       const rnd = (min,max,step=0.001)=> Math.round((min + Math.random()*(max-min))/step)*step;
       if (state.geral.tipo === 'Espada') {
@@ -520,7 +587,6 @@
       URL.revokeObjectURL(url);
     });
 
-    const fileInput = document.getElementById('fileJson');
     document.getElementById('btnLoad').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', async (e) => {
       const file = e.target.files?.[0]; if (!file) return;
@@ -540,6 +606,14 @@
       e.target.value = '';
     });
 
+    // Tela cheia (útil em mobile)
+    document.getElementById('btnFS').addEventListener('click', async () => {
+      try {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+        else await document.exitFullscreen();
+      } catch (_) {}
+    });
+
     // ===== Loop =====
     rebuild();
     let t = 0;
@@ -552,11 +626,19 @@
     }
     animate();
 
-    // Resize
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
+    // Resize / orientation — com debounce
+    let rAF;
+    function onResize() {
+      cancelAnimationFrame(rAF);
+      rAF = requestAnimationFrame(() => {
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+        setRendererSize();
+        fitCameraToObject(model, 1.2);
+      });
+    }
+    addEventListener('resize', onResize);
+    addEventListener('orientationchange', onResize, { passive: true });
 
     console.log('Forge3D — este app destina-se a uso criativo/didático para assets digitais (jogos/arte). Não para construção de itens reais.');
   </script>
